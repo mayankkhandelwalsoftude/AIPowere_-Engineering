@@ -145,12 +145,20 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold text-gray-900">AI Learning Platform</h1>
             <p className="text-sm text-gray-600">Admin Dashboard</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-          >
-            Logout
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/scoring')}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              📊 Score Plans
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
 
