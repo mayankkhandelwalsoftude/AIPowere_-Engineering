@@ -49,8 +49,11 @@ export default function AdminDashboard() {
   const [planForm, setPlanForm] = useState({
     employee_id: '',
     title: '',
+    plan_type: 'GenAI',
     technology_area: '',
     objective: '',
+    learning_objectives: '',
+    milestones: '',
     start_date: '',
     end_date: '',
     priority: 1,
@@ -114,8 +117,11 @@ export default function AdminDashboard() {
       setPlanForm({
         employee_id: '',
         title: '',
+        plan_type: 'GenAI',
         technology_area: '',
         objective: '',
+        learning_objectives: '',
+        milestones: '',
         start_date: '',
         end_date: '',
         priority: 1,
@@ -306,11 +312,11 @@ export default function AdminDashboard() {
                 {showPlanForm && (
                   <div className="mb-6 p-4 border rounded-lg bg-gray-50">
                     <h3 className="text-lg font-medium mb-4">Create Learning Plan</h3>
-                    <form onSubmit={handleCreatePlan} className="grid grid-cols-2 gap-4">
+                    <form onSubmit={handleCreatePlan} className="space-y-4">
                       <select
                         value={planForm.employee_id}
                         onChange={(e) => setPlanForm({ ...planForm, employee_id: e.target.value })}
-                        className="px-3 py-2 border rounded col-span-2"
+                        className="w-full px-3 py-2 border rounded"
                         required
                       >
                         <option value="">Select Employee</option>
@@ -320,63 +326,109 @@ export default function AdminDashboard() {
                           </option>
                         ))}
                       </select>
+                      
                       <input
                         type="text"
                         placeholder="Plan Title"
                         value={planForm.title}
                         onChange={(e) => setPlanForm({ ...planForm, title: e.target.value })}
-                        className="px-3 py-2 border rounded col-span-2"
+                        className="w-full px-3 py-2 border rounded"
                         required
                       />
-                      <input
-                        type="text"
-                        placeholder="Technology Area (e.g., AI, React, Python)"
-                        value={planForm.technology_area}
-                        onChange={(e) => setPlanForm({ ...planForm, technology_area: e.target.value })}
-                        className="px-3 py-2 border rounded col-span-2"
-                      />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <select
+                          value={planForm.plan_type}
+                          onChange={(e) => setPlanForm({ ...planForm, plan_type: e.target.value })}
+                          className="px-3 py-2 border rounded"
+                        >
+                          <option value="GenAI">GenAI</option>
+                          <option value="AI Engineering">AI Engineering</option>
+                          <option value="MLOps">MLOps</option>
+                          <option value="Data Engineering">Data Engineering</option>
+                          <option value="AI Agents">AI Agents</option>
+                          <option value="LLMOps">LLMOps</option>
+                          <option value="RAG">RAG</option>
+                          <option value="MCP">MCP</option>
+                          <option value="Cloud AI">Cloud AI</option>
+                          <option value="AI Security">AI Security</option>
+                          <option value="Custom">Custom</option>
+                        </select>
+                        
+                        <input
+                          type="text"
+                          placeholder="Technology Area (e.g., Python, TensorFlow)"
+                          value={planForm.technology_area}
+                          onChange={(e) => setPlanForm({ ...planForm, technology_area: e.target.value })}
+                          className="px-3 py-2 border rounded"
+                        />
+                      </div>
+                      
                       <textarea
                         placeholder="Objective"
                         value={planForm.objective}
                         onChange={(e) => setPlanForm({ ...planForm, objective: e.target.value })}
-                        className="px-3 py-2 border rounded col-span-2"
+                        className="w-full px-3 py-2 border rounded"
+                        rows={2}
+                      />
+
+                      <textarea
+                        placeholder="Learning Objectives (bullet points or comma-separated)"
+                        value={planForm.learning_objectives}
+                        onChange={(e) => setPlanForm({ ...planForm, learning_objectives: e.target.value })}
+                        className="w-full px-3 py-2 border rounded"
                         rows={3}
                       />
-                      <input
-                        type="date"
-                        placeholder="Start Date"
-                        value={planForm.start_date}
-                        onChange={(e) => setPlanForm({ ...planForm, start_date: e.target.value })}
-                        className="px-3 py-2 border rounded"
+
+                      <textarea
+                        placeholder="Milestones (e.g., Week 1: Setup, Week 2: Build POC...)"
+                        value={planForm.milestones}
+                        onChange={(e) => setPlanForm({ ...planForm, milestones: e.target.value })}
+                        className="w-full px-3 py-2 border rounded"
+                        rows={3}
                       />
-                      <input
-                        type="date"
-                        placeholder="End Date"
-                        value={planForm.end_date}
-                        onChange={(e) => setPlanForm({ ...planForm, end_date: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                      />
-                      <select
-                        value={planForm.priority}
-                        onChange={(e) => setPlanForm({ ...planForm, priority: parseInt(e.target.value) })}
-                        className="px-3 py-2 border rounded"
-                      >
-                        <option value={1}>Priority: Low</option>
-                        <option value={2}>Priority: Medium</option>
-                        <option value={3}>Priority: High</option>
-                      </select>
-                      <select
-                        value={planForm.status}
-                        onChange={(e) => setPlanForm({ ...planForm, status: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Pending Approval">Pending Approval</option>
-                        <option value="Approved">Approved</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                      <div className="col-span-2 flex gap-2">
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="date"
+                          placeholder="Start Date"
+                          value={planForm.start_date}
+                          onChange={(e) => setPlanForm({ ...planForm, start_date: e.target.value })}
+                          className="px-3 py-2 border rounded"
+                        />
+                        <input
+                          type="date"
+                          placeholder="End Date"
+                          value={planForm.end_date}
+                          onChange={(e) => setPlanForm({ ...planForm, end_date: e.target.value })}
+                          className="px-3 py-2 border rounded"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <select
+                          value={planForm.priority}
+                          onChange={(e) => setPlanForm({ ...planForm, priority: parseInt(e.target.value) })}
+                          className="px-3 py-2 border rounded"
+                        >
+                          <option value={1}>Priority: Low</option>
+                          <option value={2}>Priority: Medium</option>
+                          <option value={3}>Priority: High</option>
+                        </select>
+                        <select
+                          value={planForm.status}
+                          onChange={(e) => setPlanForm({ ...planForm, status: e.target.value })}
+                          className="px-3 py-2 border rounded"
+                        >
+                          <option value="Draft">Draft</option>
+                          <option value="Pending Approval">Pending Approval</option>
+                          <option value="Approved">Approved</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </div>
+
+                      <div className="flex gap-2">
                         <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                           Create Plan
                         </button>
@@ -412,6 +464,7 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                       <div className="flex gap-4 text-sm text-gray-600">
+                        <span>📦 {plan.plan_type || 'General'}</span>
                         <span>📚 {plan.technology_area || 'General'}</span>
                         <span>📅 {new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
                         <span>🎯 Priority: {plan.priority}</span>
