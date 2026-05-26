@@ -18,11 +18,16 @@ interface LearningPlan {
   plan_id: string
   title: string
   employee_id: string
+  plan_type: string
   technology_area: string
+  objective: string
+  learning_objectives: string
+  milestones: string
   status: string
   start_date: string
   end_date: string
   priority: number
+  completion_percentage: number
   employee_master?: { name: string }
 }
 
