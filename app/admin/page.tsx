@@ -28,7 +28,7 @@ interface LearningPlan {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'approvals'>('users')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [learningPlans, setLearningPlans] = useState<LearningPlan[]>([])
   const [loading, setLoading] = useState(true)
