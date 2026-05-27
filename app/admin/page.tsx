@@ -31,276 +31,190 @@ interface LearningPlan {
   employee_master?: { name: string } | { name: string }[]
 }
 
+interface AIScore {
+  learning_score: number
+  relevance_score: number
+  execution_score: number
+  delivery_score: number
+  authenticity_score: number
+  final_score: number
+}
+
+const PLAN_TYPES = ['GenAI','AI Engineering','MLOps','Data Engineering','AI Agents','LLMOps','RAG','MCP','Cloud AI','AI Security','Custom']
+const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+const labelCls = "block text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide"
+
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'users' | 'plans' | 'approvals'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'plans'>('users')
   const [employees, setEmployees] = useState<Employee[]>([])
   const [learningPlans, setLearningPlans] = useState<LearningPlan[]>([])
   const [loading, setLoading] = useState(true)
-  
-  // User form state
+  const [selectedPlan, setSelectedPlan] = useState<LearningPlan | null>(null)
+  const [planAIScore, setPlanAIScore] = useState<AIScore | null>(null)
+  const [commentText, setCommentText] = useState('')
+  const [adminId, setAdminId] = useState('')
+  const [sendingComment, setSendingComment] = useState(false)
+
   const [showUserForm, setShowUserForm] = useState(false)
-  const [userForm, setUserForm] = useState({
-    name: '',
-    email: '',
-    role: 'Employee',
-    department: '',
-    bu: '',
-    experience_years: 0,
-  })
+  const [userForm, setUserForm] = useState({ name: '', email: '', role: 'Employee', department: '', bu: '', experience_years: 0 })
 
-  // Plan form state
-  const [showPlanForm, setShowPlanForm] = useState(false)
-  const [planForm, setPlanForm] = useState({
-    employee_id: '',
-    title: '',
-    plan_type: 'GenAI',
-    technology_area: '',
-    objective: '',
-    learning_objectives: '',
-    milestones: '',
-    start_date: '',
-    end_date: '',
-    priority: 1,
-    status: 'Draft',
-  })
-
-  useEffect(() => {
-    checkAuth()
-    fetchData()
-  }, [activeTab])
+  useEffect(() => { checkAuth() }, [])
+  useEffect(() => { fetchData() }, [activeTab])
+  useEffect(() => { if (selectedPlan) fetchPlanAIScore(selectedPlan.plan_id, selectedPlan.employee_id) }, [selectedPlan])
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
-      router.push('/')
-    }
+    if (!session) { router.push('/'); return }
+    const { data: emp } = await supabase.from('employee_master').select('employee_id').eq('email', session.user.email).single()
+    if (emp) setAdminId(emp.employee_id)
   }
 
   const fetchData = async () => {
     setLoading(true)
     if (activeTab === 'users') {
-      const { data, error } = await supabase
-        .from('employee_master')
-        .select('*')
-        .order('name')
-      if (!error) setEmployees(data || [])
+      const { data } = await supabase.from('employee_master').select('*').order('name')
+      if (data) setEmployees(data)
     } else {
-      const { data, error } = await supabase
-        .from('learning_plans')
-        .select(`
-          *,
-          employee_master (name)
-        `)
-        .order('created_at', { ascending: false })
-      if (!error) setLearningPlans(data || [])
+      const { data } = await supabase.from('learning_plans').select(`*, employee_master(name)`).order('created_at', { ascending: false })
+      if (data) setLearningPlans(data)
     }
     setLoading(false)
   }
 
+  const fetchPlanAIScore = async (planId: string, empId: string) => {
+    const { data } = await supabase.from('ai_evaluation_scores').select('*').eq('plan_id', planId).eq('employee_id', empId).single()
+    setPlanAIScore(data || null)
+  }
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error } = await supabase
-      .from('employee_master')
-      .insert([userForm])
-    
-    if (!error) {
-      setShowUserForm(false)
-      setUserForm({ name: '', email: '', role: 'Employee', department: '', bu: '', experience_years: 0 })
-      fetchData()
-    }
+    const { error } = await supabase.from('employee_master').insert([userForm])
+    if (!error) { setShowUserForm(false); setUserForm({ name: '', email: '', role: 'Employee', department: '', bu: '', experience_years: 0 }); fetchData() }
   }
 
-  const handleCreatePlan = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const { error } = await supabase
-      .from('learning_plans')
-      .insert([planForm])
-    
-    if (!error) {
-      setShowPlanForm(false)
-      setPlanForm({
-        employee_id: '',
-        title: '',
-        plan_type: 'GenAI',
-        technology_area: '',
-        objective: '',
-        learning_objectives: '',
-        milestones: '',
-        start_date: '',
-        end_date: '',
-        priority: 1,
-        status: 'Draft',
-      })
-      fetchData()
-    }
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !selectedPlan || !adminId) return
+    setSendingComment(true)
+    const { error } = await supabase.from('plan_comments').insert([{
+      plan_id: selectedPlan.plan_id,
+      commenter_id: adminId,
+      comment_text: commentText.trim(),
+    }])
+    if (!error) { setCommentText(''); alert('Comment added. Employee will see it on their dashboard.') }
+    else alert('Error adding comment: ' + error.message)
+    setSendingComment(false)
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/') }
+
+  const getEmployeeName = (plan: LearningPlan) => {
+    if (!plan.employee_master) return 'Unknown'
+    if (Array.isArray(plan.employee_master)) return plan.employee_master[0]?.name || 'Unknown'
+    return (plan.employee_master as any).name || 'Unknown'
+  }
+
+  const statusColor = (status: string) => {
+    if (status === 'Completed') return 'bg-green-100 text-green-700'
+    if (status === 'In Progress') return 'bg-blue-100 text-blue-700'
+    if (status === 'Active') return 'bg-purple-100 text-purple-700'
+    return 'bg-gray-100 text-gray-600'
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Learning Platform</h1>
-            <p className="text-sm text-gray-600">Admin Dashboard</p>
+            <h1 className="text-xl font-bold text-gray-900">AI Learning Platform</h1>
+            <p className="text-sm text-gray-500">Admin Dashboard</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => router.push('/scoring')}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              📊 Score Plans
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-            >
-              Logout
-            </button>
+            <button onClick={() => router.push('/scoring')} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">Score Plans</button>
+            <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm">Logout</button>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg shadow">
+        {/* Stats Bar */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[
+            ['Total Users', employees.length, 'blue'],
+            ['Total Plans', learningPlans.length, 'green'],
+            ['Active Plans', learningPlans.filter(p => p.status === 'Active' || p.status === 'In Progress').length, 'purple'],
+            ['Completed', learningPlans.filter(p => p.status === 'Completed').length, 'orange'],
+          ].map(([label, val, color]) => (
+            <div key={String(label)} className="bg-white rounded-xl shadow-sm p-4">
+              <p className="text-2xl font-bold text-gray-800">{val}</p>
+              <p className="text-sm text-gray-500">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-6 py-3 font-medium ${
-                activeTab === 'users'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              User Management
-            </button>
-            <button
-              onClick={() => setActiveTab('plans')}
-              className={`px-6 py-3 font-medium ${
-                activeTab === 'plans'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Learning Plans
-            </button>
+            {(['users', 'plans'] as const).map(tab => (
+              <button key={tab} onClick={() => { setActiveTab(tab); setSelectedPlan(null) }}
+                className={`px-6 py-3 text-sm font-medium capitalize ${activeTab === tab ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                {tab === 'users' ? `User Management (${employees.length})` : `Learning Plans (${learningPlans.length})`}
+              </button>
+            ))}
           </div>
 
           <div className="p-6">
-            {/* User Management Tab */}
+            {/* USERS TAB */}
             {activeTab === 'users' && (
               <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Users ({employees.length})</h2>
-                  <button
-                    onClick={() => setShowUserForm(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Add User
-                  </button>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="font-semibold text-gray-800">All Users</h2>
+                  <button onClick={() => setShowUserForm(!showUserForm)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">+ Add User</button>
                 </div>
 
                 {showUserForm && (
-                  <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-                    <h3 className="text-lg font-medium mb-4">Create New User</h3>
-                    <form onSubmit={handleCreateUser} className="grid grid-cols-2 gap-4">
-                      <input
-                        type="text"
-                        placeholder="Name"
-                        value={userForm.name}
-                        onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                        required
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email"
-                        value={userForm.email}
-                        onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                        required
-                      />
-                      <select
-                        value={userForm.role}
-                        onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                      >
-                        <option value="Employee">Employee</option>
-                        <option value="Admin">Admin</option>
-                        <option value="Manager">Manager</option>
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Department"
-                        value={userForm.department}
-                        onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Business Unit"
-                        value={userForm.bu}
-                        onChange={(e) => setUserForm({ ...userForm, bu: e.target.value })}
-                        className="px-3 py-2 border rounded"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Experience (years)"
-                        value={userForm.experience_years}
-                        onChange={(e) => setUserForm({ ...userForm, experience_years: parseInt(e.target.value) })}
-                        className="px-3 py-2 border rounded"
-                        min="0"
-                      />
-                      <div className="col-span-2 flex gap-2">
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                          Create User
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowUserForm(false)}
-                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                        >
-                          Cancel
-                        </button>
+                  <div className="mb-6 p-5 border rounded-xl bg-blue-50">
+                    <h3 className="font-semibold mb-4">Create New User</h3>
+                    <form onSubmit={handleCreateUser} className="grid grid-cols-3 gap-3">
+                      <div><label className={labelCls}>Name *</label><input type="text" value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} className={inputCls} required /></div>
+                      <div><label className={labelCls}>Email *</label><input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} className={inputCls} required /></div>
+                      <div>
+                        <label className={labelCls}>Role</label>
+                        <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className={inputCls}>
+                          {['Employee','Admin','Manager','Delivery Head','BU Head','AI Evaluator','HR/L&D'].map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </div>
+                      <div><label className={labelCls}>Department</label><input type="text" value={userForm.department} onChange={e => setUserForm({...userForm, department: e.target.value})} className={inputCls} /></div>
+                      <div><label className={labelCls}>Business Unit</label><input type="text" value={userForm.bu} onChange={e => setUserForm({...userForm, bu: e.target.value})} className={inputCls} /></div>
+                      <div><label className={labelCls}>Experience (years)</label><input type="number" value={userForm.experience_years} onChange={e => setUserForm({...userForm, experience_years: parseInt(e.target.value)})} className={inputCls} min={0} /></div>
+                      <div className="col-span-3 flex gap-2">
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Create User</button>
+                        <button type="button" onClick={() => setShowUserForm(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">Cancel</button>
                       </div>
                     </form>
                   </div>
                 )}
 
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Name</th>
-                        <th className="px-4 py-2 text-left">Email</th>
-                        <th className="px-4 py-2 text-left">Role</th>
-                        <th className="px-4 py-2 text-left">Department</th>
-                        <th className="px-4 py-2 text-left">Experience</th>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        {['Name','Email','Role','Department','BU','Exp'].map(h => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
+                        ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      {employees.map((emp) => (
-                        <tr key={emp.employee_id} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-3">{emp.name}</td>
-                          <td className="px-4 py-3">{emp.email}</td>
+                    <tbody className="divide-y divide-gray-100">
+                      {employees.map(emp => (
+                        <tr key={emp.employee_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium">{emp.name}</td>
+                          <td className="px-4 py-3 text-gray-500">{emp.email}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              emp.role === 'Admin' ? 'bg-purple-100 text-purple-800' :
-                              emp.role === 'Manager' ? 'bg-blue-100 text-blue-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {emp.role}
-                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${emp.role === 'Admin' ? 'bg-purple-100 text-purple-700' : emp.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{emp.role}</span>
                           </td>
-                          <td className="px-4 py-3">{emp.department || '-'}</td>
-                          <td className="px-4 py-3">{emp.experience_years} years</td>
+                          <td className="px-4 py-3 text-gray-500">{emp.department || '-'}</td>
+                          <td className="px-4 py-3 text-gray-500">{emp.bu || '-'}</td>
+                          <td className="px-4 py-3 text-gray-500">{emp.experience_years}y</td>
                         </tr>
                       ))}
                     </tbody>
@@ -309,181 +223,106 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Learning Plans Tab */}
+            {/* PLANS TAB */}
             {activeTab === 'plans' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Learning Plans ({learningPlans.length})</h2>
-                  <button
-                    onClick={() => setShowPlanForm(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                  >
-                    Create Plan
-                  </button>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Plan List */}
+                <div>
+                  <h2 className="font-semibold text-gray-800 mb-4">All Learning Plans</h2>
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                    {loading ? <p className="text-gray-400 text-sm">Loading...</p> :
+                      learningPlans.map(plan => (
+                        <div key={plan.plan_id} onClick={() => setSelectedPlan(plan)}
+                          className={`p-4 border rounded-xl cursor-pointer transition ${selectedPlan?.plan_id === plan.plan_id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300 bg-white'}`}>
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="font-semibold text-sm text-gray-900">{plan.title}</p>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColor(plan.status)}`}>{plan.status}</span>
+                          </div>
+                          <p className="text-xs text-gray-500">{getEmployeeName(plan)} · {plan.plan_type}</p>
+                          <div className="flex gap-2 mt-2 text-xs text-gray-400">
+                            <span>{new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
                 </div>
 
-                {showPlanForm && (
-                  <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-                    <h3 className="text-lg font-medium mb-4">Create Learning Plan</h3>
-                    <form onSubmit={handleCreatePlan} className="space-y-4">
-                      <select
-                        value={planForm.employee_id}
-                        onChange={(e) => setPlanForm({ ...planForm, employee_id: e.target.value })}
-                        className="w-full px-3 py-2 border rounded"
-                        required
-                      >
-                        <option value="">Select Employee</option>
-                        {employees.map((emp) => (
-                          <option key={emp.employee_id} value={emp.employee_id}>
-                            {emp.name} ({emp.email})
-                          </option>
-                        ))}
-                      </select>
-                      
-                      <input
-                        type="text"
-                        placeholder="Plan Title"
-                        value={planForm.title}
-                        onChange={(e) => setPlanForm({ ...planForm, title: e.target.value })}
-                        className="w-full px-3 py-2 border rounded"
-                        required
-                      />
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <select
-                          value={planForm.plan_type}
-                          onChange={(e) => setPlanForm({ ...planForm, plan_type: e.target.value })}
-                          className="px-3 py-2 border rounded"
-                        >
-                          <option value="GenAI">GenAI</option>
-                          <option value="AI Engineering">AI Engineering</option>
-                          <option value="MLOps">MLOps</option>
-                          <option value="Data Engineering">Data Engineering</option>
-                          <option value="AI Agents">AI Agents</option>
-                          <option value="LLMOps">LLMOps</option>
-                          <option value="RAG">RAG</option>
-                          <option value="MCP">MCP</option>
-                          <option value="Cloud AI">Cloud AI</option>
-                          <option value="AI Security">AI Security</option>
-                          <option value="Custom">Custom</option>
-                        </select>
-                        
-                        <input
-                          type="text"
-                          placeholder="Technology Area (e.g., Python, TensorFlow)"
-                          value={planForm.technology_area}
-                          onChange={(e) => setPlanForm({ ...planForm, technology_area: e.target.value })}
-                          className="px-3 py-2 border rounded"
-                        />
-                      </div>
-                      
-                      <textarea
-                        placeholder="Objective"
-                        value={planForm.objective}
-                        onChange={(e) => setPlanForm({ ...planForm, objective: e.target.value })}
-                        className="w-full px-3 py-2 border rounded"
-                        rows={2}
-                      />
-
-                      <textarea
-                        placeholder="Learning Objectives (bullet points or comma-separated)"
-                        value={planForm.learning_objectives}
-                        onChange={(e) => setPlanForm({ ...planForm, learning_objectives: e.target.value })}
-                        className="w-full px-3 py-2 border rounded"
-                        rows={3}
-                      />
-
-                      <textarea
-                        placeholder="Milestones (e.g., Week 1: Setup, Week 2: Build POC...)"
-                        value={planForm.milestones}
-                        onChange={(e) => setPlanForm({ ...planForm, milestones: e.target.value })}
-                        className="w-full px-3 py-2 border rounded"
-                        rows={3}
-                      />
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <input
-                          type="date"
-                          placeholder="Start Date"
-                          value={planForm.start_date}
-                          onChange={(e) => setPlanForm({ ...planForm, start_date: e.target.value })}
-                          className="px-3 py-2 border rounded"
-                        />
-                        <input
-                          type="date"
-                          placeholder="End Date"
-                          value={planForm.end_date}
-                          onChange={(e) => setPlanForm({ ...planForm, end_date: e.target.value })}
-                          className="px-3 py-2 border rounded"
-                        />
+                {/* Plan Detail + Comment */}
+                <div>
+                  {selectedPlan ? (
+                    <div className="space-y-4">
+                      {/* Plan Info */}
+                      <div className="bg-gray-50 border rounded-xl p-4">
+                        <h3 className="font-bold text-gray-900 mb-1">{selectedPlan.title}</h3>
+                        <p className="text-sm text-gray-500 mb-3">{getEmployeeName(selectedPlan)} · {selectedPlan.plan_type}</p>
+                        {selectedPlan.objective && (
+                          <div className="bg-white rounded-lg p-3 mb-2">
+                            <p className="text-xs font-semibold text-gray-500 mb-1">OBJECTIVE</p>
+                            <p className="text-sm text-gray-700">{selectedPlan.objective}</p>
+                          </div>
+                        )}
+                        {selectedPlan.learning_objectives && (
+                          <div className="bg-white rounded-lg p-3">
+                            <p className="text-xs font-semibold text-gray-500 mb-1">LEARNING OBJECTIVES</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-line">{selectedPlan.learning_objectives}</p>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <select
-                          value={planForm.priority}
-                          onChange={(e) => setPlanForm({ ...planForm, priority: parseInt(e.target.value) })}
-                          className="px-3 py-2 border rounded"
-                        >
-                          <option value={1}>Priority: Low</option>
-                          <option value={2}>Priority: Medium</option>
-                          <option value={3}>Priority: High</option>
-                        </select>
-                        <select
-                          value={planForm.status}
-                          onChange={(e) => setPlanForm({ ...planForm, status: e.target.value })}
-                          className="px-3 py-2 border rounded"
-                        >
-                          <option value="Draft">Draft</option>
-                          <option value="Pending Approval">Pending Approval</option>
-                          <option value="Approved">Approved</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                          Create Plan
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowPlanForm(false)}
-                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {learningPlans.map((plan) => (
-                    <div key={plan.plan_id} className="p-4 border rounded-lg hover:shadow-md transition">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-semibold text-lg">{plan.title}</h3>
-                          <p className="text-sm text-gray-600">
-                            {Array.isArray(plan.employee_master) ? plan.employee_master[0]?.name : plan.employee_master?.name || 'Unknown Employee'}
-                          </p>
+                      {/* AI Score */}
+                      {planAIScore && (
+                        <div className="bg-white border rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-semibold text-sm">AI Evaluation Score</h4>
+                            <span className="text-2xl font-bold text-blue-600">{Number(planAIScore.final_score).toFixed(1)}/100</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {[
+                              ['Learning', planAIScore.learning_score],
+                              ['Relevance', planAIScore.relevance_score],
+                              ['Execution', planAIScore.execution_score],
+                              ['Delivery', planAIScore.delivery_score],
+                            ].map(([label, score]) => (
+                              <div key={String(label)} className="bg-gray-50 rounded p-2">
+                                <div className="flex justify-between mb-1">
+                                  <span className="text-gray-600">{label}</span>
+                                  <span className="font-bold">{score}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1">
+                                  <div className="bg-blue-500 h-1 rounded-full" style={{ width: `${score}%` }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <span className={`px-3 py-1 rounded text-sm font-medium ${
-                          plan.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                          plan.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                          plan.status === 'Approved' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {plan.status}
-                        </span>
-                      </div>
-                      <div className="flex gap-4 text-sm text-gray-600">
-                        <span>📦 {plan.plan_type || 'General'}</span>
-                        <span>📚 {plan.technology_area || 'General'}</span>
-                        <span>📅 {new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
-                        <span>🎯 Priority: {plan.priority}</span>
+                      )}
+
+                      {/* Add Comment */}
+                      <div className="bg-white border rounded-xl p-4">
+                        <h4 className="font-semibold text-sm mb-3">Add Comment</h4>
+                        <textarea
+                          value={commentText}
+                          onChange={e => setCommentText(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500"
+                          rows={3}
+                          placeholder="Add feedback or note for this employee's plan..."
+                        />
+                        <button
+                          onClick={handleAddComment}
+                          disabled={!commentText.trim() || sendingComment}
+                          className="mt-2 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 text-sm font-medium"
+                        >
+                          {sendingComment ? 'Sending...' : 'Add Comment'}
+                        </button>
+                        <p className="text-xs text-gray-400 mt-2">Employee will see this comment on their dashboard.</p>
                       </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-12 text-center text-gray-400 text-sm">
+                      Select a plan to view details and add comments
+                    </div>
+                  )}
                 </div>
               </div>
             )}
