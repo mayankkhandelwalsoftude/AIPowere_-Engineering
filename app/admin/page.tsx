@@ -28,7 +28,7 @@ interface LearningPlan {
   end_date: string
   priority: number
   completion_percentage: number
-  employee_master?: { name: string }
+  employee_master?: { name: string } | { name: string }[]
 }
 
 export default function AdminDashboard() {
@@ -464,7 +464,7 @@ export default function AdminDashboard() {
                         <div>
                           <h3 className="font-semibold text-lg">{plan.title}</h3>
                           <p className="text-sm text-gray-600">
-                            {plan.employee_master?.name || 'Unknown Employee'}
+                            {Array.isArray(plan.employee_master) ? plan.employee_master[0]?.name : plan.employee_master?.name || 'Unknown Employee'}
                           </p>
                         </div>
                         <span className={`px-3 py-1 rounded text-sm font-medium ${

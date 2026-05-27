@@ -15,7 +15,7 @@ interface LearningPlan {
   title: string
   plan_type: string
   employee_id: string
-  employee_master?: { name: string }
+  employee_master?: { name: string } | { name: string }[]
 }
 
 interface ScoreData {
@@ -252,7 +252,7 @@ export default function ScoringPage() {
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h3 className="font-semibold text-lg mb-2">{selectedPlanData.title}</h3>
                 <p className="text-sm text-gray-600">
-                  Type: {selectedPlanData.plan_type} | Employee: {selectedPlanData.employee_master?.name}
+                  Type: {selectedPlanData.plan_type} | Employee: {Array.isArray(selectedPlanData.employee_master) ? selectedPlanData.employee_master[0]?.name : selectedPlanData.employee_master?.name}
                 </p>
               </div>
 
