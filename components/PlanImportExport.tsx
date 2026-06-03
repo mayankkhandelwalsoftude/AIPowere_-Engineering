@@ -208,12 +208,22 @@ export default function PlanImportExport({ employeeId, onPlanCreated, onClose }:
       setUploadStatus(p => [...p, 'Creating plan in database...'])
       const priorityMap: Record<string, number> = { Low: 1, Medium: 2, High: 3 }
 
+      const VALID_TYPES = ['GenAI','AI Engineering','MLOps','Data Engineering','AI Agents','LLMOps','RAG','MCP','Cloud AI','AI Security','Custom']
+      const rawType = planMap['Plan Type'] || ''
+      const planType = VALID_TYPES.includes(rawType.trim())
+        ? rawType.trim()
+        : (VALID_TYPES.find(t => rawType.toLowerCase().includes(t.toLowerCase())) || 'Custom')
+
+      if (planType === 'Custom' && rawType) {
+        setUploadStatus(p => [...p, `Note: Plan Type "${rawType}" mapped to "Custom" (not a standard type)`])
+      }
+
       const { data: newPlan, error: planErr } = await supabase
         .from('learning_plans')
         .insert([{
           employee_id: employeeId,
           title: planMap['Plan Title'],
-          plan_type: planMap['Plan Type'] || 'GenAI',
+          plan_type: planType,
           technology_area: planMap['Technology Area'] || '',
           objective: planMap['Objective'],
           learning_objectives: planMap['Learning Objectives'] || '',
